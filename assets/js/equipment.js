@@ -285,21 +285,79 @@ const showItemInfo = (item, icon, type, i) => {
     let unEquip = document.querySelector("#un-equip");
     unEquip.onclick = function () {
         if (type == "Equip") {
-            // Remove the item from the inventory and add it to the equipment
-            if (player.equipped.length >= 6) {
-                sfxDeny.play();
-            } else {
-                sfxEquip.play();
-
-                // Equip the item
-                player.inventory.equipment.splice(i, 1);
-                player.equipped.push(item);
-
+            // Check if player already has an item of this type equipped
+            let hasItemOfSameType = false;
+            let existingItemIndex = -1;
+            
+            for (let j = 0; j < player.equipped.length; j++) {
+                if (player.equipped[j].type === item.type) {
+                    hasItemOfSameType = true;
+                    existingItemIndex = j;
+                    break;
+                }
+            }
+            
+            if (hasItemOfSameType) {
+                sfxOpen.play();
                 itemInfo.style.display = "none";
-                dimContainer.style.filter = "brightness(100%)";
-                playerLoadStats();
-                saveData();
-                continueExploring();
+                defaultModalElement.style.display = "flex";
+                defaultModalElement.innerHTML = `
+                <div class="content">
+                    <p>You already have a ${item.type} equipped. Replace it?</p>
+                    <div class="button-container">
+                        <button id="replace-confirm">Replace</button>
+                        <button id="replace-cancel">Cancel</button>
+                    </div>
+                </div>`;
+                
+                let confirm = document.querySelector("#replace-confirm");
+                let cancel = document.querySelector("#replace-cancel");
+                
+                confirm.onclick = function() {
+                    sfxEquip.play();
+                    
+                    // Unequip existing item of same type
+                    const existingItem = player.equipped[existingItemIndex];
+                    player.equipped.splice(existingItemIndex, 1);
+                    player.inventory.equipment.push(JSON.stringify(existingItem));
+                    
+                    // Equip the new item
+                    player.inventory.equipment.splice(i, 1);
+                    player.equipped.push(item);
+                    
+                    defaultModalElement.style.display = "none";
+                    defaultModalElement.innerHTML = "";
+                    dimContainer.style.filter = "brightness(100%)";
+                    playerLoadStats();
+                    saveData();
+                    continueExploring();
+                };
+                
+                cancel.onclick = function() {
+                    sfxDecline.play();
+                    defaultModalElement.style.display = "none";
+                    defaultModalElement.innerHTML = "";
+                    itemInfo.style.display = "flex";
+                    continueExploring();
+                };
+                
+            } else {
+                // Normal equip flow when no item of same type is equipped
+                if (player.equipped.length >= 6) {
+                    sfxDeny.play();
+                } else {
+                    sfxEquip.play();
+    
+                    // Equip the item
+                    player.inventory.equipment.splice(i, 1);
+                    player.equipped.push(item);
+    
+                    itemInfo.style.display = "none";
+                    dimContainer.style.filter = "brightness(100%)";
+                    playerLoadStats();
+                    saveData();
+                    continueExploring();
+                }
             }
         } else if (type == "Unequip") {
             sfxUnequip.play();
@@ -372,6 +430,63 @@ const showItemInfo = (item, icon, type, i) => {
     };
 }
 
+// Compare an inventory item with equipped items of the same type
+const compareEquipment = (inventoryItem) => {
+    // Find if there's an equipped item of the same type
+    let equippedItem = null;
+    for (let i = 0; i < player.equipped.length; i++) {
+        if (player.equipped[i].type === inventoryItem.type) {
+            equippedItem = player.equipped[i];
+            break;
+        }
+    }
+    
+    if (!equippedItem) return "none"; // No equipped item of this type
+    
+    // Calculate total stat value for both items
+    let inventoryValue = 0;
+    let equippedValue = 0;
+    
+    // Calculate weighted values for inventory item
+    inventoryItem.stats.forEach(stat => {
+        for (const key in stat) {
+            // Weight different stats based on their importance
+            let weight = 1;
+            if (key === "hp") weight = 0.5;
+            if (key === "atk") weight = 1.5;
+            if (key === "def") weight = 1;
+            if (key === "atkSpd") weight = 2;
+            if (key === "vamp") weight = 1.5;
+            if (key === "critRate") weight = 2;
+            if (key === "critDmg") weight = 2;
+            
+            inventoryValue += stat[key] * weight;
+        }
+    });
+    
+    // Calculate weighted values for equipped item
+    equippedItem.stats.forEach(stat => {
+        for (const key in stat) {
+            // Weight different stats based on their importance
+            let weight = 1;
+            if (key === "hp") weight = 0.5;
+            if (key === "atk") weight = 1.5;
+            if (key === "def") weight = 1;
+            if (key === "atkSpd") weight = 2;
+            if (key === "vamp") weight = 1.5;
+            if (key === "critRate") weight = 2;
+            if (key === "critDmg") weight = 2;
+            
+            equippedValue += stat[key] * weight;
+        }
+    });
+    
+    // Return comparison result
+    if (inventoryValue > equippedValue * 1.1) return "better";
+    if (inventoryValue < equippedValue * 0.9) return "worse";
+    return "similar";
+}
+
 // Show inventory
 const showInventory = () => {
     // Clear the inventory container
@@ -385,11 +500,23 @@ const showInventory = () => {
     for (let i = 0; i < player.inventory.equipment.length; i++) {
         const item = JSON.parse(player.inventory.equipment[i]);
 
+        // Compare with equipped items
+        const comparison = compareEquipment(item);
+        let comparisonIcon = "";
+        
+        if (comparison === "better") {
+            comparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
+        } else if (comparison === "worse") {
+            comparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
+        } else if (comparison === "similar") {
+            comparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
+        }
+
         // Create an element to display the item's name
         let itemDiv = document.createElement('div');
         let icon = equipmentIcon(item.category);
         itemDiv.className = "items";
-        itemDiv.innerHTML = `<p class="${item.rarity}">${icon}${item.rarity} ${item.category}</p>`;
+        itemDiv.innerHTML = `<p class="${item.rarity}">${icon}${item.rarity} ${item.category}${comparisonIcon}</p>`;
         itemDiv.addEventListener('click', function () {
             let type = "Equip";
             showItemInfo(item, icon, type, i);
