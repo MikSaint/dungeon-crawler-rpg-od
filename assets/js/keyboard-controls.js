@@ -26,8 +26,8 @@ document.addEventListener('keydown', function(event) {
             style.id = 'keyboard-nav-styles';
             style.textContent = `
                 button.keyboard-selected {
-                    outline: 2px solid white !important;
-                    box-shadow: 0 0 5px rgba(255, 255, 255, 0.7) !important;
+                    background-color: white !important;
+                    color: black !important;
                 }
             `;
             document.head.appendChild(style);
