@@ -181,7 +181,7 @@ const dungeonEvent = () => {
                 dungeon.status.event = true;
                 choices = `
                     <div class="decision-panel">
-                        <button id="choice1"><i class="fa fa-swords"></i> Engage</button>
+                        <button id="choice1"><i class="ra ra-crossed-swords"></i> Engage</button>
                         <button id="choice2"><i class="fa fa-running"></i> Flee</button>
                     </div>`;
                 generateRandomEnemy();
