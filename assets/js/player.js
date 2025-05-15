@@ -5,8 +5,14 @@ const lvlupSelect = document.querySelector("#lvlupSelect");
 const lvlupPanel = document.querySelector("#lvlupPanel");
 
 const playerExpGain = () => {
+    // Add debug log for XP gained
+    console.log(`XP Gained: ${enemy.rewards.exp}, Current XP before: ${player.exp.expCurr}`);
+    
     player.exp.expCurr += enemy.rewards.exp;
     player.exp.expCurrLvl += enemy.rewards.exp;
+
+    // Log after adding XP
+    console.log(`Current XP after: ${player.exp.expCurr}, XP for next level: ${player.exp.expMax}`);
 
     while (player.exp.expCurr >= player.exp.expMax) {
         playerLvlUp();
@@ -62,13 +68,29 @@ const playerLoadStats = () => {
     if (player.inCombat || playerDead) {
         const playerCombatHpElement = document.querySelector('#player-hp-battle');
         const playerHpDamageElement = document.querySelector('#player-hp-dmg');
+        const playerHpValueElement = document.querySelector('#player-hp-value');
         const playerExpElement = document.querySelector('#player-exp-bar');
         const playerInfoElement = document.querySelector('#player-combat-info');
-        playerCombatHpElement.innerHTML = `&nbsp${nFormatter(player.stats.hp)}/${nFormatter(player.stats.hpMax)}(${player.stats.hpPercent}%)`;
-        playerCombatHpElement.style.width = `${player.stats.hpPercent}%`;
-        playerHpDamageElement.style.width = `${player.stats.hpPercent}%`;
-        playerExpElement.style.width = `${player.exp.expPercent}%`;
-        playerInfoElement.innerHTML = `${player.name} Lv.${player.lvl} (${player.exp.expPercent}%)`;
+        
+        if (playerCombatHpElement) {
+            playerCombatHpElement.style.width = `${player.stats.hpPercent}%`;
+        }
+        
+        if (playerHpDamageElement) {
+            playerHpDamageElement.style.width = `${player.stats.hpPercent}%`;
+        }
+        
+        if (playerHpValueElement) {
+            playerHpValueElement.textContent = `${nFormatter(player.stats.hp)}/${nFormatter(player.stats.hpMax)}`;
+        }
+        
+        if (playerExpElement) {
+            playerExpElement.style.width = `${player.exp.expPercent}%`;
+        }
+        
+        if (playerInfoElement) {
+            playerInfoElement.innerHTML = `${player.name} Lv.${player.lvl}`;
+        }
     }
 
     // Header
@@ -95,6 +117,16 @@ const playerLoadStats = () => {
     <p><i class="ra ra-dripping-blade"></i>VAMP+${player.bonusStats.vamp.toFixed(2).replace(rx, "$1")}%</p>
     <p><i class="ra ra-lightning-bolt"></i>C.RATE+${player.bonusStats.critRate.toFixed(2).replace(rx, "$1")}%</p>
     <p><i class="ra ra-focused-lightning"></i>C.DMG+${player.bonusStats.critDmg.toFixed(2).replace(rx, "$1")}%</p>`;
+    
+    // Update HP progress bar
+    if (typeof updateHpProgressBar === 'function') {
+        updateHpProgressBar();
+    }
+    
+    // Update XP progress bar
+    if (typeof updateXpProgressBar === 'function') {
+        updateXpProgressBar();
+    }
 }
 
 // Opens inventory
@@ -238,17 +270,50 @@ const generateLvlStats = (rerolls, percentages) => {
     });
 
     try {
-        for (let i = 0; i < 4; i++) {
+        // Create a button for each selected stat (3 total)
+        for (let i = 0; i < selectedStats.length; i++) {
             let button = document.createElement("button");
             button.id = "lvlSlot" + i;
+            button.className = "lvl-option"; // Add a class for easier selection
 
-            let h3 = document.createElement("h3");
-            h3.innerHTML = selectedStats[i].replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase() + " UP";
-            button.appendChild(h3);
-
-            let p = document.createElement("p");
-            p.innerHTML = `Increase bonus ${selectedStats[i].replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()} by ${percentages[selectedStats[i]]}%.`;
-            button.appendChild(p);
+            // Get the appropriate icon for the stat
+            let statIcon;
+            switch(selectedStats[i]) {
+                case "hp":
+                    statIcon = "fas fa-heart";
+                    break;
+                case "atk":
+                    statIcon = "ra ra-sword";
+                    break;
+                case "def":
+                    statIcon = "ra ra-round-shield";
+                    break;
+                case "atkSpd":
+                    statIcon = "ra ra-plain-dagger";
+                    break;
+                case "vamp":
+                    statIcon = "ra ra-dripping-blade";
+                    break;
+                case "critRate":
+                    statIcon = "ra ra-lightning-bolt";
+                    break;
+                case "critDmg":
+                    statIcon = "ra ra-focused-lightning";
+                    break;
+                default:
+                    statIcon = "ra ra-upgrade";
+            }
+            
+            // Create the button content with icon and left-aligned text
+            button.innerHTML = `
+                <div class="lvl-option-content">
+                    <i class="${statIcon}"></i>
+                    <div class="lvl-option-text">
+                        <h3>${selectedStats[i].replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()} UP</h3>
+                        <p>Increase bonus ${selectedStats[i].replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()} by ${percentages[selectedStats[i]]}%.</p>
+                    </div>
+                </div>
+            `;
 
             // Increase the selected stat for player
             button.addEventListener("click", function () {
@@ -271,5 +336,7 @@ const generateLvlStats = (rerolls, percentages) => {
 
             lvlupSelect.appendChild(button);
         }
-    } catch (err) { }
+    } catch (err) {
+        console.error("Error generating level-up options:", err);
+    }
 }

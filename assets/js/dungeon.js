@@ -52,7 +52,7 @@ const initialDungeonLoad = () => {
     loadDungeonProgress();
     dungeonTime.innerHTML = new Date(dungeon.statistics.runtime * 1000).toISOString().slice(11, 19);
     dungeonAction.innerHTML = "Resting...";
-    dungeonActivity.innerHTML = "Explore";
+    dungeonActivity.innerHTML = "Rest";
     dungeonTime.innerHTML = "00:00:00";
     dungeonTimer = setInterval(dungeonEvent, 1000);
     playTimer = setInterval(dungeonCounter, 1000);
@@ -64,16 +64,22 @@ const dungeonStartPause = () => {
         sfxPause.play();
 
         dungeonAction.innerHTML = "Resting...";
-        dungeonActivity.innerHTML = "Explore";
+        dungeonActivity.innerHTML = "Rest";
         dungeon.status.exploring = false;
         dungeon.status.paused = true;
+        
+        // Start HP regeneration while resting
+        startRestHealing();
     } else {
         sfxUnpause.play();
 
         dungeonAction.innerHTML = "Exploring...";
-        dungeonActivity.innerHTML = "Pause";
+        dungeonActivity.innerHTML = "Rest";
         dungeon.status.exploring = true;
         dungeon.status.paused = false;
+        
+        // Stop HP regeneration while exploring
+        stopRestHealing();
     }
 }
 
@@ -114,7 +120,7 @@ const dungeonEvent = () => {
                 dungeon.status.event = true;
                 choices = `
                     <div class="decision-panel">
-                        <button id="choice1"><i class="fa fa-door-open"></i> Enter</button>
+                        <button id="choice1" class="enter-button"><i class="fa fa-door-open"></i> Enter</button>
                         <button id="choice2"><i class="fa fa-times"></i> Ignore</button>
                     </div>`;
                 if (dungeon.progress.room == dungeon.progress.roomLimit) {
@@ -181,7 +187,7 @@ const dungeonEvent = () => {
                 dungeon.status.event = true;
                 choices = `
                     <div class="decision-panel">
-                        <button id="choice1"><i class="ra ra-crossed-swords"></i> Engage</button>
+                        <button id="choice1"><i class="ra ra-crossed-swords"></i> Battle</button>
                         <button id="choice2"><i class="fa fa-running"></i> Flee</button>
                     </div>`;
                 generateRandomEnemy();
@@ -202,7 +208,7 @@ const dungeonEvent = () => {
                     let cost = player.blessing * (500 * (player.blessing * 0.5)) + 750;
                     choices = `
                         <div class="decision-panel">
-                            <button id="choice1"><i class="fa fa-hand-holding-usd"></i> Offer</button>
+                            <button id="choice1" class="offer-button"><i class="fa fa-hand-holding-usd"></i> Offer</button>
                             <button id="choice2"><i class="fa fa-times"></i> Ignore</button>
                         </div>`;
                     addDungeonLog(`<span class="Legendary">You found a Statue of Blessing. Do you want to offer <i class="fas fa-coins" style="color: #FFD700;"></i><span class="Common">${nFormatter(cost)}</span> to gain blessings? (Blessing Lv.${player.blessing})</span>`, choices);
@@ -473,6 +479,23 @@ const updateDungeonLog = (choices) => {
         let eventChoices = document.createElement("div");
         eventChoices.innerHTML = choices;
         dungeonLog.appendChild(eventChoices);
+        
+        // Add styling classes to buttons after they're added to the DOM
+        const choice1Button = document.querySelector("#choice1");
+        const choice2Button = document.querySelector("#choice2");
+        
+        if (choice1Button) {
+            // Add classes based on button content
+            if (choice1Button.innerHTML.includes("fa-door-open")) {
+                choice1Button.classList.add("enter-button");
+            } 
+            else if (choice1Button.innerHTML.includes("fa-hand-holding-usd")) {
+                choice1Button.classList.add("offer-button");
+            }
+            else if (choice1Button.innerHTML.includes("ra-crossed-swords")) {
+                // Already has the green style from CSS
+            }
+        }
     }
 
     dungeonLog.scrollTop = dungeonLog.scrollHeight;

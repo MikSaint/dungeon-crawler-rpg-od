@@ -13,3 +13,4 @@ const confirmationModalElement = document.querySelector('#confirmationModal');
 const sellAllElement = document.querySelector("#sell-all");
 const sellRarityElement = document.querySelector('#sell-rarity');
 const menuModalElement = document.querySelector('#menuModal');
+const equipmentInfoElement = document.querySelector('#equipmentInfo');

@@ -298,49 +298,22 @@ const showItemInfo = (item, icon, type, i) => {
             }
             
             if (hasItemOfSameType) {
-                sfxOpen.play();
+                sfxEquip.play();
+                
+                // Unequip existing item of same type
+                const existingItem = player.equipped[existingItemIndex];
+                player.equipped.splice(existingItemIndex, 1);
+                player.inventory.equipment.push(JSON.stringify(existingItem));
+                
+                // Equip the new item
+                player.inventory.equipment.splice(i, 1);
+                player.equipped.push(item);
+                
                 itemInfo.style.display = "none";
-                defaultModalElement.style.display = "flex";
-                defaultModalElement.innerHTML = `
-                <div class="content">
-                    <p>You already have a ${item.type} equipped. Replace it?</p>
-                    <div class="button-container">
-                        <button id="replace-confirm">Replace</button>
-                        <button id="replace-cancel">Cancel</button>
-                    </div>
-                </div>`;
-                
-                let confirm = document.querySelector("#replace-confirm");
-                let cancel = document.querySelector("#replace-cancel");
-                
-                confirm.onclick = function() {
-                    sfxEquip.play();
-                    
-                    // Unequip existing item of same type
-                    const existingItem = player.equipped[existingItemIndex];
-                    player.equipped.splice(existingItemIndex, 1);
-                    player.inventory.equipment.push(JSON.stringify(existingItem));
-                    
-                    // Equip the new item
-                    player.inventory.equipment.splice(i, 1);
-                    player.equipped.push(item);
-                    
-                    defaultModalElement.style.display = "none";
-                    defaultModalElement.innerHTML = "";
-                    dimContainer.style.filter = "brightness(100%)";
-                    playerLoadStats();
-                    saveData();
-                    continueExploring();
-                };
-                
-                cancel.onclick = function() {
-                    sfxDecline.play();
-                    defaultModalElement.style.display = "none";
-                    defaultModalElement.innerHTML = "";
-                    itemInfo.style.display = "flex";
-                    continueExploring();
-                };
-                
+                dimContainer.style.filter = "brightness(100%)";
+                playerLoadStats();
+                saveData();
+                continueExploring();
             } else {
                 // Normal equip flow when no item of same type is equipped
                 if (player.equipped.length >= 6) {
@@ -637,19 +610,61 @@ const sellAll = (rarity) => {
 const createEquipmentPrint = (condition) => {
     let rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
     let item = createEquipment();
+    
+    // Compare with equipped items
+    const comparison = compareEquipment(item);
+    let comparisonIcon = "";
+    
+    if (comparison === "better") {
+        comparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
+    } else if (comparison === "worse") {
+        comparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
+    } else if (comparison === "similar") {
+        comparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
+    }
+    
     let panel = `
         <div class="primary-panel" style="padding: 0.5rem; margin-top: 0.5rem;">
-                <h4 class="${item.rarity}"><b>${item.icon}${item.rarity} ${item.category}</b></h4>
+                <h4 class="${item.rarity}"><b>${item.icon}${item.rarity} ${item.category}${comparisonIcon}</b></h4>
                 <h5 class="${item.rarity}"><b>Lv.${item.lvl} Tier ${item.tier}</b></h5>
                 <ul>
                 ${item.stats.map(stat => {
-        if (Object.keys(stat)[0] === "critRate" || Object.keys(stat)[0] === "critDmg" || Object.keys(stat)[0] === "atkSpd" || Object.keys(stat)[0] === "vamp") {
-            return `<li>${Object.keys(stat)[0].toString().replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()}+${stat[Object.keys(stat)[0]].toFixed(2).replace(rx, "$1")}%</li>`;
-        }
-        else {
-            return `<li>${Object.keys(stat)[0].toString().replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()}+${stat[Object.keys(stat)[0]]}</li>`;
-        }
-    }).join('')}
+                    // Get the stat key and value
+                    const statKey = Object.keys(stat)[0];
+                    const statValue = stat[statKey];
+                    
+                    // Find if player has an equipped item of the same type
+                    let equippedItemStat = 0;
+                    for (let i = 0; i < player.equipped.length; i++) {
+                        if (player.equipped[i].type === item.type) {
+                            // Find the matching stat in the equipped item
+                            for (let j = 0; j < player.equipped[i].stats.length; j++) {
+                                if (Object.keys(player.equipped[i].stats[j])[0] === statKey) {
+                                    equippedItemStat = player.equipped[i].stats[j][statKey];
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    
+                    // Determine comparison icon for this specific stat
+                    let statComparisonIcon = "";
+                    if (statValue > equippedItemStat * 1.1) {
+                        statComparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
+                    } else if (statValue < equippedItemStat * 0.9 && equippedItemStat > 0) {
+                        statComparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
+                    } else if (equippedItemStat > 0) {
+                        statComparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
+                    }
+                    
+                    // Format the stat display
+                    if (statKey === "critRate" || statKey === "critDmg" || statKey === "atkSpd" || statKey === "vamp") {
+                        return `<li>${statKey.toString().replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()}+${statValue.toFixed(2).replace(rx, "$1")}%${statComparisonIcon}</li>`;
+                    } else {
+                        return `<li>${statKey.toString().replace(/([A-Z])/g, ".$1").replace(/crit/g, "c").toUpperCase()}+${statValue}${statComparisonIcon}</li>`;
+                    }
+                }).join('')}
             </ul>
         </div>`;
     if (condition == "combat") {

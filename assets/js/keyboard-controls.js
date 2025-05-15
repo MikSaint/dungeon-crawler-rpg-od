@@ -11,6 +11,62 @@ document.addEventListener('keydown', function(event) {
         }
     }
     
+    // Handle Escape key to trigger run button during combat
+    if (event.code === 'Escape') {
+        const combatPanel = document.querySelector('#combatPanel');
+        if (combatPanel && combatPanel.style.display === 'flex') {
+            const runButton = document.querySelector('#runButton');
+            if (runButton && !runButton.disabled) {
+                event.preventDefault();
+                runButton.click();
+                return;
+            }
+        }
+    }
+    
+    // Toggle play/pause with space bar during gameplay
+    if (event.code === 'Space') {
+        const dungeonActivity = document.querySelector('#dungeonActivity');
+        const mainScreen = document.querySelector('#dungeon-main');
+        // Only toggle play/pause if on the main dungeon screen and no modals are open
+        if (dungeonActivity && mainScreen && mainScreen.style.display === 'flex' && 
+            !document.querySelector('.decision-panel') && 
+            !document.querySelector('#lvlupPanel[style*="display: flex"]') &&
+            !document.querySelector('#inventory[style*="display: flex"]') &&
+            !document.querySelector('#equipmentInfo[style*="display: flex"]') &&
+            !document.querySelector('#defaultModal[style*="display: flex"]') &&
+            !document.querySelector('#confirmationModal[style*="display: flex"]')) {
+            event.preventDefault();
+            dungeonActivity.click();
+            return;
+        }
+    }
+    
+    // Handle single button actions with Enter key
+    if (event.code === 'Enter') {
+        // Check for single button scenarios (like "claim" buttons)
+        const visibleModals = [
+            '#defaultModal', 
+            '#confirmationModal',
+            '#equipmentInfo',
+            '#combatPanel:not([style*="display: none"])'
+        ];
+        
+        for (const modalSelector of visibleModals) {
+            const modal = document.querySelector(modalSelector);
+            if (modal && window.getComputedStyle(modal).display !== 'none') {
+                const buttons = modal.querySelectorAll('button');
+                // If there's only one button, click it
+                if (buttons.length === 1) {
+                    event.preventDefault();
+                    buttons[0].click();
+                    return;
+                }
+                break;
+            }
+        }
+    }
+    
     // Check if level-up panel is visible
     const lvlupPanel = document.querySelector('#lvlupPanel');
     if (lvlupPanel && lvlupPanel.style.display === 'flex') {
@@ -89,7 +145,7 @@ document.addEventListener('keydown', function(event) {
     
     // If there's only one option, allow space or either arrow key to select it
     if (buttons.length === 1) {
-        if (event.code === 'Space' || event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
+        if (event.code === 'Space' || event.code === 'Enter' || event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
             event.preventDefault();
             buttons[0].click();
             return;
@@ -109,5 +165,57 @@ document.addEventListener('keydown', function(event) {
             buttons[1].click();
             return;
         }
+        
+        // Also allow Enter to select the first button (typically the "confirm" action)
+        if (event.code === 'Enter') {
+            event.preventDefault();
+            buttons[0].click();
+            return;
+        }
     }
-}); 
+});
+
+// Function to highlight the first option in level up screen when it appears
+const highlightFirstLevelUpOption = () => {
+    // Add a class to style the currently selected button if not already present
+    if (!document.querySelector('style#keyboard-nav-styles')) {
+        const style = document.createElement('style');
+        style.id = 'keyboard-nav-styles';
+        style.textContent = `
+            button.keyboard-selected {
+                background-color: white !important;
+                color: black !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Use MutationObserver to detect when the level up panel becomes visible
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.target.style.display === 'flex') {
+                // Wait a short moment for the buttons to be rendered
+                setTimeout(() => {
+                    const buttons = Array.from(lvlupPanel.querySelectorAll('button'))
+                        .filter(button => button.id && button.id.startsWith('lvlSlot'));
+                    
+                    if (buttons.length > 0) {
+                        // Remove any existing selections
+                        buttons.forEach(btn => btn.classList.remove('keyboard-selected'));
+                        // Select the first button
+                        buttons[0].classList.add('keyboard-selected');
+                    }
+                }, 50);
+            }
+        });
+    });
+    
+    // Start observing the level up panel
+    observer.observe(document.querySelector('#lvlupPanel'), { 
+        attributes: true, 
+        attributeFilter: ['style'] 
+    });
+};
+
+// Call the function to set up the observer
+highlightFirstLevelUpOption(); 

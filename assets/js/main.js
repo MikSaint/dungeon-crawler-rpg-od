@@ -12,7 +12,7 @@ window.addEventListener("load", function () {
         if (player.allocated) {
             enterDungeon();
         } else {
-            allocationPopup();
+            characterRandomizer();
         }
     });
 
@@ -20,6 +20,14 @@ window.addEventListener("load", function () {
     document.ondblclick = function (e) {
         e.preventDefault();
     }
+
+    // Add 'R' key listener for game restart with buffed enemy scaling
+    document.addEventListener('keydown', function(event) {
+        if (event.key.toLowerCase() === 'r') {
+            // Restart the game with buffed enemy scaling
+            restartGameWithBuffedEnemies();
+        }
+    });
 
     // Submit Name
     document.querySelector("#name-submit").addEventListener("submit", function (e) {
@@ -386,6 +394,101 @@ window.addEventListener("load", function () {
     });
 });
 
+// Function to restart the game with buffed enemy scaling
+const restartGameWithBuffedEnemies = () => {
+    sfxConfirm.play();
+    
+    // Clear existing intervals
+    if (dungeonTimer) clearInterval(dungeonTimer);
+    if (playTimer) clearInterval(playTimer);
+    if (combatTimer) clearInterval(combatTimer);
+    
+    // Stop music
+    if (bgmDungeon && bgmDungeon.playing()) bgmDungeon.stop();
+    if (bgmBattleMain && bgmBattleMain.playing()) bgmBattleMain.stop();
+    if (bgmBattleGuardian && bgmBattleGuardian.playing()) bgmBattleGuardian.stop();
+    if (bgmBattleBoss && bgmBattleBoss.playing()) bgmBattleBoss.stop();
+    
+    // Reset dungeon with buffed enemy scaling
+    if (dungeon) {
+        dungeon = {
+            rating: 500,
+            grade: "E",
+            progress: {
+                floor: 1,
+                room: 1,
+                floorLimit: 100,
+                roomLimit: 5,
+            },
+            settings: {
+                enemyBaseLvl: 1,
+                enemyLvlGap: 5,
+                enemyBaseStats: 1.5, // Buffed base stats
+                enemyScaling: 1.25,  // Buffed scaling
+            },
+            status: {
+                exploring: false,
+                paused: true,
+                event: false,
+            },
+            statistics: {
+                kills: 0,
+                runtime: 0,
+            },
+            backlog: [],
+            action: 0,
+            enemyMultipliers: {
+                hp: 1.5,       // Buffed HP
+                atk: 1.25,     // Buffed attack
+                def: 1.25,     // Buffed defense
+                atkSpd: 1.2,   // Slightly faster attacks
+                vamp: 1,
+                critRate: 1.2, // More crits
+                critDmg: 1.2   // Harder crits
+            }
+        };
+    }
+    
+    // Reset player
+    if (player) {
+        player.stats.hp = 0; // Set to 0 to trigger death reset
+        player.inCombat = false;
+        player.deaths++;
+    }
+    
+    // Save the modified data
+    saveData();
+    
+    // Return to title screen
+    let dimDungeon = document.querySelector('#dungeon-main');
+    if (dimDungeon) {
+        dimDungeon.style.filter = "brightness(100%)";
+        dimDungeon.style.display = "none";
+    }
+    
+    // Hide any open panels
+    const combatPanel = document.querySelector('#combatPanel');
+    if (combatPanel) combatPanel.style.display = "none";
+    
+    // Show notification
+    defaultModalElement.style.display = "flex";
+    defaultModalElement.innerHTML = `
+    <div class="content">
+        <h3>Game Restarted</h3>
+        <p>Enemies have been buffed to provide a greater challenge!</p>
+        <div class="button-container">
+            <button id="restart-confirm">OK</button>
+        </div>
+    </div>`;
+    
+    document.querySelector("#restart-confirm").addEventListener("click", function() {
+        sfxConfirm.play();
+        defaultModalElement.style.display = "none";
+        defaultModalElement.innerHTML = "";
+        runLoad("title-screen", "flex");
+    });
+}
+
 // Loading Screen
 const runLoad = (id, display) => {
     let loader = document.querySelector("#loading");
@@ -554,253 +657,180 @@ const importData = (importedData) => {
     }
 }
 
-// Player Stat Allocation
-const allocationPopup = () => {
-    let allocation = {
-        hp: 5,
-        atk: 5,
-        def: 5,
-        atkSpd: 5
-    }
-    const updateStats = () => {
-        stats = {
-            hp: 50 * allocation.hp,
-            atk: 10 * allocation.atk,
-            def: 10 * allocation.def,
-            atkSpd: 0.4 + (0.02 * allocation.atkSpd)
+const characterRandomizer = () => {
+    // Available passive skills
+    const passiveSkills = [
+        {name: "Remnant Razor", description: "Attacks deal extra 8% of enemies' current health on hit."},
+        {name: "Titan's Will", description: "Attacks deal extra 5% of your maximum health on hit."},
+        {name: "Devastator", description: "Deal 30% more damage but you lose 30% base attack speed."},
+        {name: "Rampager", description: "Increase attack by 5 after each hit. Stack resets after battle."},
+        {name: "Blade Dance", description: "Gain increased attack speed after each hit. Stack resets after battle."},
+        {name: "Paladin's Heart", description: "You receive 25% less damage permanently."},
+        {name: "Aegis Thorns", description: "Enemies receive 15% of the damage they dealt."}
+    ];
+    
+    // Character archetypes for flavor
+    const archetypes = [
+        {name: "Warrior", icon: "ra ra-sword"},
+        {name: "Knight", icon: "ra ra-round-shield"},
+        {name: "Assassin", icon: "ra ra-plain-dagger"},
+        {name: "Berserker", icon: "ra ra-axe"},
+        {name: "Mage", icon: "ra ra-burning-embers"},
+        {name: "Ranger", icon: "ra ra-bow-arrow"},
+        {name: "Paladin", icon: "ra ra-shield"},
+        {name: "Monk", icon: "ra ra-doubled"},
+        {name: "Druid", icon: "ra ra-pine-tree"}
+    ];
+    
+    // Generate a random character
+    const generateRandomCharacter = () => {
+        // Generate random stat allocation (min 5, total 40 points)
+        const totalPoints = 40;
+        const minStatValue = 5;
+        const stats = {
+            hp: minStatValue,
+            atk: minStatValue,
+            def: minStatValue,
+            atkSpd: minStatValue
+        };
+        
+        // Distribute remaining points randomly
+        let remainingPoints = totalPoints - (minStatValue * 4);
+        while (remainingPoints > 0) {
+            const statKeys = Object.keys(stats);
+            const randomStat = statKeys[Math.floor(Math.random() * statKeys.length)];
+            stats[randomStat]++;
+            remainingPoints--;
         }
-    }
-    updateStats();
-    let points = 20;
-    const loadContent = function () {
-        defaultModalElement.innerHTML = `
-        <div class="content" id="allocate-stats">
-            <div class="content-head">
-                <h3>Allocate Stats</h3>
-                <p id="allocate-close"><i class="fa fa-xmark"></i></p>
-            </div>
-            <div class="row">
-                <p><i class="fas fa-heart"></i><span id="hpDisplay">HP: ${stats.hp}</span></p>
-                <div class="row">
-                    <button id="hpMin">-</button>
-                    <span id="hpAllo">${allocation.hp}</span>
-                    <button id="hpAdd">+</button>
-                </div>
-            </div>
-            <div class="row">
-                <p><i class="ra ra-sword"></i><span id="atkDisplay">ATK: ${stats.atk}</span></p>
-                <div class="row">
-                    <button id="atkMin">-</button>
-                    <span id="atkAllo">${allocation.atk}</span>
-                    <button id="atkAdd">+</button>
-                </div>
-            </div>
-            <div class="row">
-                <p><i class="ra ra-round-shield"></i><span id="defDisplay">DEF: ${stats.def}</span></p>
-                <div class="row">
-                    <button id="defMin">-</button>
-                    <span id="defAllo">${allocation.def}</span>
-                    <button id="defAdd">+</button>
-                </div>
-            </div>
-            <div class="row">
-                <p><i class="ra ra-plain-dagger"></i><span id="atkSpdDisplay">ATK.SPD: ${stats.atkSpd}</span></p>
-                <div class="row">
-                    <button id="atkSpdMin">-</button>
-                    <span id="atkSpdAllo">${allocation.atkSpd}</span>
-                    <button id="atkSpdAdd">+</button>
-                </div>
-            </div>
-            <div class="row">
-                <p id="alloPts">Stat Points: ${points}</p>
-                <button id="allocate-reset">Reset</button>
-            </div>
-            <div class="row">
-                <p>Passive</p>
-                <select id="select-skill">
-                    <option value="Remnant Razor">Remnant Razor</option>
-                    <option value="Titan's Will">Titan's Will</option>
-                    <option value="Devastator">Devastator</option>
-                    <option value="Blade Dance">Blade Dance</option>
-                    <option value="Paladin's Heart">Paladin's Heart</option>
-                    <option value="Aegis Thorns">Aegis Thorns</option>
-                </select>
-            </div>
-            <div class="row primary-panel pad">
-                <p id="skill-desc">Attacks deal extra 8% of enemies' current health on hit.</p>
-            </div>
-            <button id="allocate-confirm">Confirm</button>
-        </div>`;
-    }
+        
+        // Calculate actual stat values
+        const calculatedStats = {
+            hp: 50 * stats.hp,
+            atk: 10 * stats.atk,
+            def: 10 * stats.def,
+            atkSpd: 0.4 + (0.02 * stats.atkSpd)
+        };
+        
+        // Select 1-2 random passive skills
+        const numSkills = Math.random() < 0.3 ? 2 : 1; // 30% chance for 2 skills
+        const selectedSkills = [];
+        const availableSkills = [...passiveSkills];
+        
+        for (let i = 0; i < numSkills; i++) {
+            if (availableSkills.length === 0) break;
+            const randomIndex = Math.floor(Math.random() * availableSkills.length);
+            selectedSkills.push(availableSkills[randomIndex]);
+            availableSkills.splice(randomIndex, 1);
+        }
+        
+        // Select random archetype
+        const archetype = archetypes[Math.floor(Math.random() * archetypes.length)];
+        
+        return {
+            archetype,
+            stats,
+            calculatedStats,
+            skills: selectedSkills
+        };
+    };
+    
+    // Generate three random characters
+    const characters = [
+        generateRandomCharacter(),
+        generateRandomCharacter(),
+        generateRandomCharacter()
+    ];
+    
+    // Display the character selection modal
     defaultModalElement.style.display = "flex";
     document.querySelector("#title-screen").style.filter = "brightness(50%)";
-    loadContent();
-
-    // Stat Allocation
-    const handleStatButtons = (e) => {
-        let rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
-        if (e.includes("Add")) {
-            let stat = e.split("Add")[0];
-            if (points > 0) {
-                sfxConfirm.play();
-                allocation[stat]++;
-                points--;
-                updateStats();
-                document.querySelector(`#${stat}Display`).innerHTML = `${stat.replace(/([A-Z])/g, ' $1').trim().replace(/ /g, '.').toUpperCase()}: ${stats[stat].toFixed(2).replace(rx, "$1")}`;
-                document.querySelector(`#${stat}Allo`).innerHTML = allocation[stat];
-                document.querySelector(`#alloPts`).innerHTML = `Stat Points: ${points}`;
-            } else {
-                sfxDeny.play();
-            }
-        } else if (e.includes("Min")) {
-            let stat = e.split("Min")[0];
-            if (allocation[stat] > 5) {
-                sfxConfirm.play();
-                allocation[stat]--;
-                points++;
-                updateStats();
-                document.querySelector(`#${stat}Display`).innerHTML = `${stat.replace(/([A-Z])/g, ' $1').trim().replace(/ /g, '.').toUpperCase()}: ${stats[stat].toFixed(2).replace(rx, "$1")}`;
-                document.querySelector(`#${stat}Allo`).innerHTML = allocation[stat];
-                document.querySelector(`#alloPts`).innerHTML = `Stat Points: ${points}`;
-            } else {
-                sfxDeny.play();
-            }
-        }
-    }
-    document.querySelector("#hpAdd").onclick = function () {
-        handleStatButtons("hpAdd")
-    };
-    document.querySelector("#hpMin").onclick = function () {
-        handleStatButtons("hpMin")
-    };
-    document.querySelector("#atkAdd").onclick = function () {
-        handleStatButtons("atkAdd")
-    };
-    document.querySelector("#atkMin").onclick = function () {
-        handleStatButtons("atkMin")
-    };
-    document.querySelector("#defAdd").onclick = function () {
-        handleStatButtons("defAdd")
-    };
-    document.querySelector("#defMin").onclick = function () {
-        handleStatButtons("defMin")
-    };
-    document.querySelector("#atkSpdAdd").onclick = function () {
-        handleStatButtons("atkSpdAdd")
-    };
-    document.querySelector("#atkSpdMin").onclick = function () {
-        handleStatButtons("atkSpdMin")
-    };
-
-    // Passive skills
-    let selectSkill = document.querySelector("#select-skill");
-    let skillDesc = document.querySelector("#skill-desc");
-    selectSkill.onclick = function () {
-        sfxConfirm.play();
-    }
-    selectSkill.onchange = function () {
-        if (selectSkill.value == "Remnant Razor") {
-            skillDesc.innerHTML = "Attacks deal extra 8% of enemies' current health on hit.";
-        }
-        if (selectSkill.value == "Titan's Will") {
-            skillDesc.innerHTML = "Attacks deal extra 5% of your maximum health on hit.";
-        }
-        if (selectSkill.value == "Devastator") {
-            skillDesc.innerHTML = "Deal 30% more damage but you lose 30% base attack speed.";
-        }
-        if (selectSkill.value == "Rampager") {
-            skillDesc.innerHTML = "Increase attack by 5 after each hit. Stack resets after battle.";
-        }
-        if (selectSkill.value == "Blade Dance") {
-            skillDesc.innerHTML = "Gain increased attack speed after each hit. Stack resets after battle.";
-        }
-        if (selectSkill.value == "Paladin's Heart") {
-            skillDesc.innerHTML = "You receive 25% less damage permanently.";
-        }
-        if (selectSkill.value == "Aegis Thorns") {
-            skillDesc.innerHTML = "Enemies receive 15% of the damage they dealt.";
-        }
-    }
-
-    // Operation Buttons
-    let confirm = document.querySelector("#allocate-confirm");
-    let reset = document.querySelector("#allocate-reset");
-    let close = document.querySelector("#allocate-close");
-    confirm.onclick = function () {
-        // Set allocated stats to player base stats
-        player.baseStats = {
-            hp: stats.hp,
-            atk: stats.atk,
-            def: stats.def,
-            pen: 0,
-            atkSpd: stats.atkSpd,
-            vamp: 0,
-            critRate: 0,
-            critDmg: 50
-        }
-
-        // Set player skill
-        objectValidation();
-        if (selectSkill.value == "Remnant Razor") {
-            player.skills.push("Remnant Razor");
-        }
-        if (selectSkill.value == "Titan's Will") {
-            player.skills.push("Titan's Will");
-        }
-        if (selectSkill.value == "Devastator") {
-            player.skills.push("Devastator");
-            player.baseStats.atkSpd = player.baseStats.atkSpd - ((30 * player.baseStats.atkSpd) / 100);
-        }
-        if (selectSkill.value == "Rampager") {
-            player.skills.push("Rampager");
-        }
-        if (selectSkill.value == "Blade Dance") {
-            player.skills.push("Blade Dance");
-        }
-        if (selectSkill.value == "Paladin's Heart") {
-            player.skills.push("Paladin's Heart");
-        }
-        if (selectSkill.value == "Aegis Thorns") {
-            player.skills.push("Aegis Thorns");
-        }
-
-        // Proceed to dungeon
-        player.allocated = true;
-        enterDungeon();
-        player.stats.hp = player.stats.hpMax;
-        playerLoadStats();
-        defaultModalElement.style.display = "none";
-        defaultModalElement.innerHTML = "";
-        document.querySelector("#title-screen").style.filter = "brightness(100%)";
-    }
-    reset.onclick = function () {
-        sfxDecline.play();
-        allocation = {
-            hp: 5,
-            atk: 5,
-            def: 5,
-            atkSpd: 5
-        };
-        points = 20;
-        updateStats();
-
-        // Display Reset
-        document.querySelector(`#hpDisplay`).innerHTML = `HP: ${stats.hp}`;
-        document.querySelector(`#atkDisplay`).innerHTML = `ATK: ${stats.atk}`;
-        document.querySelector(`#defDisplay`).innerHTML = `DEF: ${stats.def}`;
-        document.querySelector(`#atkSpdDisplay`).innerHTML = `ATK.SPD: ${stats.atkSpd}`;
-        document.querySelector(`#hpAllo`).innerHTML = allocation.hp;
-        document.querySelector(`#atkAllo`).innerHTML = allocation.atk;
-        document.querySelector(`#defAllo`).innerHTML = allocation.def;
-        document.querySelector(`#atkSpdAllo`).innerHTML = allocation.atkSpd;
-        document.querySelector(`#alloPts`).innerHTML = `Stat Points: ${points}`;
-    }
-    close.onclick = function () {
+    
+    // Create character cards
+    let characterCards = '';
+    characters.forEach((character, index) => {
+        const skillsList = character.skills.map(skill => 
+            `<p class="Legendary"><i class="ra ra-star-swirl"></i> ${skill.name}</p>
+             <p class="skill-description">${skill.description}</p>`
+        ).join('');
+        
+        characterCards += `
+        <div class="character-card" data-index="${index}">
+            <div class="character-header">
+                <h3><i class="${character.archetype.icon}"></i> ${character.archetype.name}</h3>
+            </div>
+            <div class="character-stats">
+                <p><i class="fas fa-heart"></i> HP: ${character.calculatedStats.hp}</p>
+                <p><i class="ra ra-sword"></i> ATK: ${character.calculatedStats.atk}</p>
+                <p><i class="ra ra-round-shield"></i> DEF: ${character.calculatedStats.def}</p>
+                <p><i class="ra ra-plain-dagger"></i> ATK.SPD: ${character.calculatedStats.atkSpd.toFixed(2)}</p>
+            </div>
+            <div class="character-skills">
+                <h4>Passive Skills:</h4>
+                ${skillsList}
+            </div>
+            <div class="select-character-btn">Select</div>
+        </div>`;
+    });
+    
+    // Display the character selection modal
+    defaultModalElement.innerHTML = `
+    <div class="content" id="character-selection">
+        <div class="content-head">
+            <h3>Choose Your Hero</h3>
+            <p id="randomizer-close"><i class="fa fa-xmark"></i></p>
+        </div>
+        <div class="character-container">
+            ${characterCards}
+        </div>
+    </div>`;
+    
+    // Add event listeners to the entire character cards
+    document.querySelectorAll('.character-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const characterIndex = parseInt(this.dataset.index);
+            const selectedCharacter = characters[characterIndex];
+            
+            // Set player base stats
+            player.baseStats = {
+                hp: selectedCharacter.calculatedStats.hp,
+                atk: selectedCharacter.calculatedStats.atk,
+                def: selectedCharacter.calculatedStats.def,
+                pen: 0,
+                atkSpd: selectedCharacter.calculatedStats.atkSpd,
+                vamp: 0,
+                critRate: 0,
+                critDmg: 50
+            };
+            
+            // Set player skills
+            objectValidation();
+            selectedCharacter.skills.forEach(skill => {
+                player.skills.push(skill.name);
+                
+                // Apply immediate effects for certain skills
+                if (skill.name === "Devastator") {
+                    player.baseStats.atkSpd = player.baseStats.atkSpd - ((30 * player.baseStats.atkSpd) / 100);
+                }
+            });
+            
+            // Proceed to dungeon
+            player.allocated = true;
+            enterDungeon();
+            player.stats.hp = player.stats.hpMax;
+            playerLoadStats();
+            defaultModalElement.style.display = "none";
+            defaultModalElement.innerHTML = "";
+            document.querySelector("#title-screen").style.filter = "brightness(100%)";
+        });
+    });
+    
+    // Add event listener to close button
+    document.querySelector("#randomizer-close").addEventListener('click', function() {
         sfxDecline.play();
         defaultModalElement.style.display = "none";
         defaultModalElement.innerHTML = "";
         document.querySelector("#title-screen").style.filter = "brightness(100%)";
-    }
+    });
 }
 
 const objectValidation = () => {

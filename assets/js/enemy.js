@@ -574,11 +574,28 @@ const enemyLoadStats = () => {
     if (enemy.stats.hp > enemy.stats.hpMax) {
         enemy.stats.hp = enemy.stats.hpMax;
     }
-    enemy.stats.hpPercent = ((enemy.stats.hp / enemy.stats.hpMax) * 100).toFixed(2).replace(rx, "$1");
+    
+    // Handle dead enemies
+    if (enemy.stats.hp <= 0) {
+        enemy.stats.hp = 0;
+        enemy.stats.hpPercent = 0;
+    } else {
+        enemy.stats.hpPercent = ((enemy.stats.hp / enemy.stats.hpMax) * 100).toFixed(2).replace(rx, "$1");
+    }
 
     const enemyHpElement = document.querySelector('#enemy-hp-battle');
     const enemyHpDamageElement = document.querySelector('#enemy-hp-dmg');
-    enemyHpElement.innerHTML = `&nbsp${nFormatter(enemy.stats.hp)}/${nFormatter(enemy.stats.hpMax)}<br>(${enemy.stats.hpPercent}%)`;
-    enemyHpElement.style.width = `${enemy.stats.hpPercent}%`;
-    enemyHpDamageElement.style.width = `${enemy.stats.hpPercent}%`;
+    const enemyHpValueElement = document.querySelector('#enemy-hp-value');
+    
+    if (enemyHpElement) {
+        enemyHpElement.style.width = `${enemy.stats.hpPercent}%`;
+    }
+    
+    if (enemyHpDamageElement) {
+        enemyHpDamageElement.style.width = `${enemy.stats.hpPercent}%`;
+    }
+    
+    if (enemyHpValueElement) {
+        enemyHpValueElement.textContent = `${nFormatter(enemy.stats.hp)}/${nFormatter(enemy.stats.hpMax)}`;
+    }
 }

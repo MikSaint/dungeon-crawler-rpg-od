@@ -173,9 +173,9 @@ main {
     min-height: 10rem;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
     padding: 0.5em;
     overflow: auto;
+    box-sizing: border-box;
 }
 
 .logBox #dungeonAction {
@@ -185,14 +185,13 @@ main {
 .logBox p {
     margin: 0.3rem 0;
     padding: 0.3rem;
+    word-wrap: break-word;
 }
 
-#dungeonLog {
+#dungeonLog, #combatLogBox {
     overflow: auto;
-}
-
-#combatLogBox {
-    overflow: auto;
+    padding-right: 0.2rem;
+    box-sizing: border-box;
 }
 
 #playerInventory {
@@ -418,6 +417,8 @@ button:focus {
     width: 100%;
     max-height: 40rem;
     padding: 0.5em;
+    display: flex;
+    flex-direction: column;
 }
 
 .battle-info-panel {
@@ -426,6 +427,22 @@ button:focus {
     gap: 0.3rem;
     padding: 0.7rem;
     margin: 0 0.5rem;
+}
+
+/* Battle Action Panel for Run Button */
+.battle-action-panel {
+    display: flex;
+    justify-content: center;
+    padding: 0.7rem;
+    margin: 0 0.5rem 0.5rem;
+    border-top: 1px solid #444;
+    background-color: rgba(0, 0, 0, 0.3);
+    gap: 1rem;
+}
+
+.battle-action-panel button {
+    min-width: 120px;
+    width: auto;
 }
 
 #enemyPanel {
@@ -439,6 +456,62 @@ button:focus {
 
 #lvlupPanel h1 {
     text-align: center;
+}
+
+/* Level Up Option Styling */
+.lvl-option {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    text-align: left;
+    padding: 0.5rem;
+}
+
+.lvl-option-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.lvl-option-content i {
+    font-size: 1.5rem;
+    min-width: 1.5rem;
+    margin-right: 0;
+}
+
+.lvl-option-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.lvl-option-text h3 {
+    margin-bottom: 0.2rem;
+}
+
+.lvl-option-text p {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* Battle Stat Row */
+.battle-stat-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.battle-stat-value {
+    flex-shrink: 0;
+    margin-left: 5px;
+    font-size: 0.8rem;
+    text-align: right;
+    min-width: 70px;
+}
+
+.xp-value {
+    color: #3498db;
+    font-weight: bold;
 }
 
 /* Battle Bars */
@@ -464,8 +537,9 @@ button:focus {
     background-color: grey;
 }
 
+/* Player HP bar in battle - green by default, orange when low, red when critical */
 .bb-hp .current {
-    background-color: #e40000;
+    background-color: #2ecc71; /* Green by default */
     margin-top: -1rem;
     transition: .1s;
     -webkit-transition: .1s;
@@ -474,9 +548,23 @@ button:focus {
     -o-transition: .1s;
 }
 
+/* Enemy HP bar in battle - always green */
+#enemyPanel .bb-hp .current {
+    background-color: #2ecc71; /* Green for enemy */
+}
+
+/* Player HP bar color changes based on percentage */
+.hp-low {
+    background-color: #e67e22 !important; /* Orange for low HP (10-20%) */
+}
+
+.hp-critical {
+    background-color: #e40000 !important; /* Red for critical HP (0-10%) */
+}
+
 .bb-xb .current {
     color: transparent;
-    background-color: #9a00b9;
+    background-color: #3498db; /* Blue for XP bar */
     transition: .1s;
     -webkit-transition: .1s;
     -moz-transition: .1s;
@@ -617,8 +705,97 @@ header button i {
 /* Decision Panel */
 .decision-panel {
     display: flex;
-    gap: 1rem;
-    margin: 0.5rem;
+    flex-direction: row;
+    gap: 0.5rem;
+    margin: 0.3rem 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.decision-panel button {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.decision-panel button i {
+    margin-right: 0.2rem;
+}
+
+/* Combat decision buttons */
+/* Green buttons - Battle/Engage */
+#choice1, #equipNowButton {
+    background-color: #2ecc71;
+    border-color: #27ae60;
+    color: white;
+}
+
+#choice1:hover, #equipNowButton:hover {
+    background-color: #27ae60;
+    color: white;
+}
+
+/* Blue buttons - Enter, Back to Menu, Claim, Close */
+#battleButton, #claimButton, #closeButton {
+    background-color: #3498db;
+    border-color: #2980b9;
+    color: white;
+}
+
+#battleButton:hover, #claimButton:hover, #closeButton:hover {
+    background-color: #2980b9;
+    color: white;
+}
+
+/* Yellow buttons - Offer */
+.offer-button {
+    background-color: #f1c40f !important;
+    border-color: #f39c12 !important;
+    color: white !important;
+}
+
+.offer-button:hover {
+    background-color: #f39c12 !important;
+    color: white !important;
+}
+
+/* Blue buttons - Enter */
+.enter-button {
+    background-color: #3498db !important;
+    border-color: #2980b9 !important;
+    color: white !important;
+}
+
+.enter-button:hover {
+    background-color: #2980b9 !important;
+    color: white !important;
+}
+
+/* Gray buttons - Flee/Ignore */
+#choice2, #runButton {
+    background-color: #333333;
+    border-color: #222222;
+    color: #dddddd;
+}
+
+#choice2:hover, #runButton:hover {
+    background-color: #555555;
+    color: white;
+}
+
+/* Persistent Run Button */
+.persistent-run {
+    position: sticky;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 0.5rem;
+    margin-top: 1rem;
+    border-top: 1px solid #444;
+    z-index: 10;
+    width: 100%;
+    justify-content: center;
 }
 
 /* Box Header */
@@ -823,4 +1000,230 @@ header button i {
         -ms-transform: scale(1.5);
         -o-transform: scale(1.5);
     }
+}
+
+/* HP Progress Bar */
+.hp-progress-container {
+    width: 100%;
+    height: 8px;
+    background-color: #444;
+    border-radius: 4px;
+    margin: 5px 0;
+    overflow: hidden;
+}
+
+.hp-progress-bar {
+    height: 100%;
+    background-color: #2ecc71; /* Green by default */
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.hp-progress-bar.hp-low {
+    background-color: #e67e22; /* Orange for low HP (10-20%) */
+}
+
+.hp-progress-bar.hp-critical {
+    background-color: #e40000; /* Red for critical HP (0-10%) */
+}
+
+/* XP Progress Bar */
+.xp-progress-container {
+    width: 100%;
+    height: 6px;
+    background-color: #444;
+    border-radius: 3px;
+    margin: 5px 0;
+    overflow: hidden;
+}
+
+.xp-progress-bar {
+    height: 100%;
+    background-color: #3498db;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+/* Character Selection */
+#character-selection {
+    max-width: 90%;
+    width: 800px;
+    padding: 1rem;
+}
+
+.character-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.character-card {
+    width: 220px;
+    padding: 1rem;
+    border: 1px solid white;
+    border-radius: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.character-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.character-header {
+    margin-bottom: 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 0.5rem;
+}
+
+.character-header h3 {
+    font-size: 1.2rem;
+}
+
+.character-stats {
+    margin-bottom: 1rem;
+}
+
+.character-stats p {
+    margin: 0.3rem 0;
+}
+
+.character-skills {
+    margin-bottom: 1rem;
+    flex-grow: 1;
+}
+
+.character-skills h4 {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 0.3rem;
+}
+
+.skill-description {
+    font-size: 0.85rem;
+    color: #ccc;
+    margin-top: 0.2rem;
+    margin-bottom: 0.5rem;
+    padding-left: 0.5rem;
+}
+
+.select-character-btn {
+    margin-top: auto;
+    width: 100%;
+    background-color: rgba(255, 255, 255, 0.1);
+    transition: background-color 0.2s;
+    text-align: center;
+    padding: 0.4rem 1rem;
+    border-radius: 0.3rem;
+    border: solid 1px white;
+}
+
+.character-card:hover .select-character-btn {
+    background-color: white;
+    color: black;
+}
+
+/* Media queries for responsive character selection */
+@media (max-width: 700px) {
+    .character-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .character-card {
+        width: 100%;
+        max-width: 300px;
+    }
+}
+
+/* Dead Enemy Effect */
+.enemy-dead {
+    opacity: 0.2;
+    filter: grayscale(100%);
+    transition: opacity 0.8s, filter 0.8s;
+}
+
+/* Dead Enemy X Overlay */
+#enemyPanel {
+    position: relative;
+}
+
+.enemy-dead-x {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #e40000;
+    font-size: 5rem;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.8s;
+    pointer-events: none;
+}
+
+.enemy-dead-x.visible {
+    opacity: 0.8;
+}
+
+/* Enemy Preview in Dungeon Log */
+.enemy-preview {
+    display: inline-flex;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.3);
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 0.3rem;
+    margin: 0.3rem 0;
+    gap: 0.5rem;
+}
+
+.enemy-preview img {
+    margin: 0;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 0.2rem;
+}
+
+.enemy-preview span {
+    font-weight: bold;
+}
+
+/* Attack Timer Bars */
+.attack-timer-container {
+    width: 100%;
+    height: 5px;
+    background-color: #444;
+    margin-top: 5px;
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+    display: inline-block;
+}
+
+.attack-timer-bar {
+    height: 100%;
+    background-color: white;
+    border-radius: 2px;
+    width: 0%;
+    transition: width linear;
+    will-change: width;
+}
+
+.attack-timer-text {
+    font-size: 0.7rem;
+    color: #ccc;
+    margin-top: 2px;
+    margin-bottom: 5px;
+    text-align: right;
+    width: 100%;
+    display: block;
+    padding-right: 5px;
 }
