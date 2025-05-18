@@ -180,6 +180,7 @@ const generateRandomEnemy = (condition) => {
         enemy.name = "Door Mimic";
     }
     setEnemyImg();
+    setEnemyRewards(condition);
 }
 
 // Set a randomly generated stat for the enemy
@@ -597,5 +598,33 @@ const enemyLoadStats = () => {
     
     if (enemyHpValueElement) {
         enemyHpValueElement.textContent = `${nFormatter(enemy.stats.hp)}/${nFormatter(enemy.stats.hpMax)}`;
+    }
+}
+
+// Set enemy rewards
+const setEnemyRewards = (condition) => {
+    // Base values for rewards
+    let baseExp = randomizeNum(20, 35); // Reduced base XP (was likely higher)
+    let baseGold = randomizeNum(10, 30);
+    let dropChance = randomizeNum(1, 100);
+    
+    // Calculate rewards based on enemy level and type
+    enemy.rewards = {
+        exp: Math.round(baseExp * (enemy.lvl * 0.7)), // Reduced XP scaling factor (was likely 1.0 or higher)
+        gold: Math.round(baseGold * (enemy.lvl * 0.8)),
+        drop: null
+    };
+    
+    // Special rewards for bosses
+    if (condition == "guardian") {
+        enemy.rewards.exp = Math.round(baseExp * (enemy.lvl * 1.0)); // Better reward for bosses, but still controlled
+        enemy.rewards.gold = Math.round(baseGold * (enemy.lvl * 1.5));
+        enemy.rewards.drop = true;
+    } else if (condition == "sboss") {
+        enemy.rewards.exp = Math.round(baseExp * (enemy.lvl * 1.5)); // Better reward for special bosses
+        enemy.rewards.gold = Math.round(baseGold * (enemy.lvl * 2.0));
+        enemy.rewards.drop = true;
+    } else if (dropChance <= 10) {
+        enemy.rewards.drop = true;
     }
 }

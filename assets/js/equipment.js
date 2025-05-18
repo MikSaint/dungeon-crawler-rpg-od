@@ -607,56 +607,108 @@ const sellAll = (rarity) => {
     }
 }
 
-const createEquipmentPrint = (condition) => {
-    let rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
-    let item = createEquipment();
+// Function to check if a slot is empty and auto-equip if it is
+const autoEquipGear = (equipment) => {
+    // Check if the player already has equipment of this type
+    let hasEquippedOfType = false;
     
-    // Compare with equipped items
-    const comparison = compareEquipment(item);
-    let comparisonIcon = "";
-    
-    if (comparison === "better") {
-        comparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
-    } else if (comparison === "worse") {
-        comparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
-    } else if (comparison === "similar") {
-        comparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
+    for (let i = 0; i < player.equipped.length; i++) {
+        if (player.equipped[i].type === equipment.type) {
+            hasEquippedOfType = true;
+            break;
+        }
     }
     
+    // If no equipment of this type is equipped, auto-equip this one
+    if (!hasEquippedOfType) {
+        // Find the equipment in the inventory
+        let equipmentIndex = -1;
+        for (let i = 0; i < player.inventory.equipment.length; i++) {
+            const item = JSON.parse(player.inventory.equipment[i]);
+            if (item.category === equipment.category && 
+                item.rarity === equipment.rarity && 
+                item.lvl === equipment.lvl) {
+                equipmentIndex = i;
+                break;
+            }
+        }
+        
+        if (equipmentIndex !== -1) {
+            // Remove from inventory and add to equipped
+            const itemToEquip = JSON.parse(player.inventory.equipment[equipmentIndex]);
+            player.inventory.equipment.splice(equipmentIndex, 1);
+            player.equipped.push(itemToEquip);
+            
+            // Update player stats
+            playerLoadStats();
+            saveData();
+            
+            return true; // Indicate that auto-equip was performed
+        }
+    }
+    
+    return false; // No auto-equip was needed or possible
+}
+
+// Prints out the equipment stats
+const createEquipmentPrint = (condition) => {
+    let item = createEquipment();
+
+    // Check if we should auto-equip (only if slot is empty)
+    const itemObject = JSON.parse(player.inventory.equipment[player.inventory.equipment.length - 1]);
+    const wasAutoEquipped = autoEquipGear(itemObject);
+
+    // Comparison indicators for stats
+    const compareEquipmentStat = (statKey, statValue) => {
+        // Check if player has any equipped items of the same type
+        let comparisonIcon = "";
+        let existingItem = null;
+        
+        for (let i = 0; i < player.equipped.length; i++) {
+            if (player.equipped[i].type === item.type) {
+                existingItem = player.equipped[i];
+                break;
+            }
+        }
+        
+        if (existingItem) {
+            // Find the same stat in the existing item
+            let existingStatValue = 0;
+            for (let i = 0; i < existingItem.stats.length; i++) {
+                if (Object.keys(existingItem.stats[i])[0] === statKey) {
+                    existingStatValue = existingItem.stats[i][statKey];
+                    break;
+                }
+            }
+            
+            // Compare the stats
+            if (statValue > existingStatValue) {
+                comparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
+            } else if (statValue < existingStatValue) {
+                comparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
+            } else if (statValue === existingStatValue) {
+                comparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
+            }
+        }
+        
+        return comparisonIcon;
+    };
+
     let panel = `
-        <div class="primary-panel" style="padding: 0.5rem; margin-top: 0.5rem;">
-                <h4 class="${item.rarity}"><b>${item.icon}${item.rarity} ${item.category}${comparisonIcon}</b></h4>
-                <h5 class="${item.rarity}"><b>Lv.${item.lvl} Tier ${item.tier}</b></h5>
-                <ul>
+        <div class="equipment-panel">
+            <div class="equipment-header">
+                <span class="${item.rarity}">${equipmentIcon(item.category)}${item.rarity} ${item.category}</span>
+                <span class="Common">Lv.${item.lvl}</span>
+                ${item.tier > 0 ? `<span class="Legendary">T${item.tier}</span>` : ''}
+            </div>
+            <ul>
                 ${item.stats.map(stat => {
                     // Get the stat key and value
                     const statKey = Object.keys(stat)[0];
                     const statValue = stat[statKey];
                     
-                    // Find if player has an equipped item of the same type
-                    let equippedItemStat = 0;
-                    for (let i = 0; i < player.equipped.length; i++) {
-                        if (player.equipped[i].type === item.type) {
-                            // Find the matching stat in the equipped item
-                            for (let j = 0; j < player.equipped[i].stats.length; j++) {
-                                if (Object.keys(player.equipped[i].stats[j])[0] === statKey) {
-                                    equippedItemStat = player.equipped[i].stats[j][statKey];
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    
-                    // Determine comparison icon for this specific stat
-                    let statComparisonIcon = "";
-                    if (statValue > equippedItemStat * 1.1) {
-                        statComparisonIcon = '<i class="fa fa-arrow-up" style="color: #1eff00; margin-left: 5px;"></i>';
-                    } else if (statValue < equippedItemStat * 0.9 && equippedItemStat > 0) {
-                        statComparisonIcon = '<i class="fa fa-arrow-down" style="color: #e40000; margin-left: 5px;"></i>';
-                    } else if (equippedItemStat > 0) {
-                        statComparisonIcon = '<i class="fa fa-equals" style="color: #ffff00; margin-left: 5px;"></i>';
-                    }
+                    // Get comparison icon
+                    const statComparisonIcon = compareEquipmentStat(statKey, statValue);
                     
                     // Format the stat display
                     if (statKey === "critRate" || statKey === "critDmg" || statKey === "atkSpd" || statKey === "vamp") {
@@ -667,11 +719,247 @@ const createEquipmentPrint = (condition) => {
                 }).join('')}
             </ul>
         </div>`;
+        
+    // Add action buttons for all drops (combat and dungeon)
+    let actionButtons = '';
+    if (!wasAutoEquipped) {
+        actionButtons = `
+        <div class="decision-panel">
+            <button id="equipNowButton-inline"><i class="ra ra-sword"></i> Equip Now</button>
+            <button id="sellNowButton-inline"><i class="fas fa-coins"></i> Sell Now</button>
+        </div>`;
+    } else {
+        // Show auto-equip message
+        actionButtons = `<p class="Legendary"><i class="ra ra-sword"></i> Auto-equipped!</p>`;
+    }
+    
     if (condition == "combat") {
         addCombatLog(`
-        ${enemy.name} dropped <span class="${item.rarity}">${item.rarity} ${item.category}</span>.<br>${panel}`);
+        ${enemy.name} dropped <span class="${item.rarity}">${item.rarity} ${item.category}</span>.<br>${panel}${actionButtons}`);
+        
+        // Add event listeners for equip and sell buttons if item wasn't auto-equipped
+        if (!wasAutoEquipped) {
+            // Add event listeners after a short delay to ensure DOM elements are created
+            setTimeout(() => {
+                const equipButton = document.querySelector("#equipNowButton-inline");
+                if (equipButton) {
+                    equipButton.addEventListener("click", function() {
+                        sfxConfirm.play();
+                        showLastDroppedEquipment();
+                    });
+                }
+                
+                const sellButton = document.querySelector("#sellNowButton-inline");
+                if (sellButton) {
+                    sellButton.addEventListener("click", function() {
+                        sfxSell.play();
+                        sellLastDroppedEquipment();
+                    });
+                }
+            }, 100);
+        }
     } else if (condition == "dungeon") {
         addDungeonLog(`
-        You got <span class="${item.rarity}">${item.rarity} ${item.category}</span>.<br>${panel}`);
+        You got <span class="${item.rarity}">${item.rarity} ${item.category}</span>.<br>${panel}${actionButtons}`);
+        
+        // Add event listeners for dungeon log equip and sell buttons if item wasn't auto-equipped
+        if (!wasAutoEquipped) {
+            setTimeout(() => {
+                const equipButton = document.querySelector("#equipNowButton-inline");
+                if (equipButton) {
+                    equipButton.addEventListener("click", function() {
+                        sfxConfirm.play();
+                        showLastDroppedEquipmentDungeon();
+                    });
+                }
+                
+                const sellButton = document.querySelector("#sellNowButton-inline");
+                if (sellButton) {
+                    sellButton.addEventListener("click", function() {
+                        sfxSell.play();
+                        sellLastDroppedEquipmentDungeon();
+                    });
+                }
+            }, 100);
+        }
     }
+}
+
+// Function to show the last dropped equipment for equipping in dungeon log
+const showLastDroppedEquipmentDungeon = () => {
+    // Find the most recently dropped equipment
+    const lastEquipmentString = player.inventory.equipment[player.inventory.equipment.length - 1];
+    
+    if (!lastEquipmentString) return;
+    
+    // Parse the JSON string to get the equipment object
+    const lastEquipment = JSON.parse(lastEquipmentString);
+    
+    if (!lastEquipment) return;
+    
+    // Get the appropriate icon for the equipment
+    const icon = equipmentIcon(lastEquipment.category);
+    
+    // Equip the item directly
+    const index = player.inventory.equipment.length - 1;
+    
+    // Check if player already has an item of this type equipped
+    let hasItemOfSameType = false;
+    let existingItemIndex = -1;
+    
+    for (let j = 0; j < player.equipped.length; j++) {
+        if (player.equipped[j].type === lastEquipment.type) {
+            hasItemOfSameType = true;
+            existingItemIndex = j;
+            break;
+        }
+    }
+    
+    if (hasItemOfSameType) {
+        // Unequip existing item of same type
+        const existingItem = player.equipped[existingItemIndex];
+        player.equipped.splice(existingItemIndex, 1);
+        player.inventory.equipment.push(JSON.stringify(existingItem));
+    }
+    
+    // Equip the new item
+    player.inventory.equipment.splice(index, 1);
+    player.equipped.push(lastEquipment);
+    
+    // Update player stats
+    playerLoadStats();
+    saveData();
+    
+    // Show a brief notification in the dungeon log
+    addDungeonLog(`You equipped ${lastEquipment.category}.`);
+    
+    // Find and fade out the equipment panel and remove buttons
+    setTimeout(() => {
+        const equipmentPanels = document.querySelectorAll('.equipment-panel');
+        const actionButtons = document.querySelectorAll('.decision-panel');
+        
+        // Get the last equipment panel (most recently added)
+        const lastPanel = equipmentPanels[equipmentPanels.length - 1];
+        
+        // Get the last action buttons panel (associated with the equipment)
+        const lastButtons = actionButtons[actionButtons.length - 1];
+        
+        if (lastPanel) {
+            // Add a fade-out class
+            lastPanel.style.opacity = '0.5';
+            lastPanel.style.filter = 'grayscale(100%)';
+            lastPanel.style.transition = 'opacity 0.5s, filter 0.5s';
+        }
+        
+        if (lastButtons) {
+            // Remove the buttons
+            lastButtons.style.display = 'none';
+        }
+    }, 100);
+}
+
+// Function to sell the last dropped equipment from combat log
+const sellLastDroppedEquipment = () => {
+    // Find the most recently dropped equipment
+    const lastEquipmentString = player.inventory.equipment[player.inventory.equipment.length - 1];
+    
+    if (!lastEquipmentString) return;
+    
+    // Parse the JSON string to get the equipment object
+    const lastEquipment = JSON.parse(lastEquipmentString);
+    
+    if (!lastEquipment) return;
+    
+    // Get the gold value
+    const goldValue = lastEquipment.value || 100; // Default to 100 if no value is set
+    
+    // Remove the equipment from inventory
+    player.inventory.equipment.splice(player.inventory.equipment.length - 1, 1);
+    
+    // Add gold to player
+    player.gold += goldValue;
+    
+    // Update player stats
+    playerLoadStats();
+    saveData();
+    
+    // Show a brief notification in the combat log
+    addCombatLog(`You sold ${lastEquipment.category} for <i class="fas fa-coins" style="color: #FFD700;"></i>${nFormatter(goldValue)}.`);
+    
+    // Find and fade out the equipment panel and remove buttons
+    setTimeout(() => {
+        const equipmentPanels = document.querySelectorAll('.equipment-panel');
+        const actionButtons = document.querySelectorAll('.decision-panel');
+        
+        // Get the last equipment panel (most recently added)
+        const lastPanel = equipmentPanels[equipmentPanels.length - 1];
+        
+        // Get the last action buttons panel (associated with the equipment)
+        const lastButtons = actionButtons[actionButtons.length - 1];
+        
+        if (lastPanel) {
+            // Add a fade-out class
+            lastPanel.style.opacity = '0.5';
+            lastPanel.style.filter = 'grayscale(100%)';
+            lastPanel.style.transition = 'opacity 0.5s, filter 0.5s';
+        }
+        
+        if (lastButtons) {
+            // Remove the buttons
+            lastButtons.style.display = 'none';
+        }
+    }, 100);
+}
+
+// Function to sell the last dropped equipment from dungeon log
+const sellLastDroppedEquipmentDungeon = () => {
+    // Find the most recently dropped equipment
+    const lastEquipmentString = player.inventory.equipment[player.inventory.equipment.length - 1];
+    
+    if (!lastEquipmentString) return;
+    
+    // Parse the JSON string to get the equipment object
+    const lastEquipment = JSON.parse(lastEquipmentString);
+    
+    if (!lastEquipment) return;
+    
+    // Get the gold value
+    const goldValue = lastEquipment.value || 100; // Default to 100 if no value is set
+    
+    // Remove the equipment from inventory
+    player.inventory.equipment.splice(player.inventory.equipment.length - 1, 1);
+    
+    // Add gold to player
+    player.gold += goldValue;
+    
+    // Update player stats
+    playerLoadStats();
+    saveData();
+    
+    // Show a brief notification in the dungeon log
+    addDungeonLog(`You sold ${lastEquipment.category} for <i class="fas fa-coins" style="color: #FFD700;"></i>${nFormatter(goldValue)}.`);
+    
+    // Find and fade out the equipment panel and remove buttons
+    setTimeout(() => {
+        const equipmentPanels = document.querySelectorAll('.equipment-panel');
+        const actionButtons = document.querySelectorAll('.decision-panel');
+        
+        // Get the last equipment panel (most recently added)
+        const lastPanel = equipmentPanels[equipmentPanels.length - 1];
+        
+        // Get the last action buttons panel (associated with the equipment)
+        const lastButtons = actionButtons[actionButtons.length - 1];
+        
+        if (lastPanel) {
+            // Add a fade-out class
+            lastPanel.style.opacity = '0.5';
+            lastPanel.style.filter = 'grayscale(100%)';
+            lastPanel.style.transition = 'opacity 0.5s, filter 0.5s';
+        }
+        
+        if (lastButtons) {
+            // Remove the buttons
+            lastButtons.style.display = 'none';
+        }
+    }, 100);
 }

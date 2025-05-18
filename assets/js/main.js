@@ -1,4 +1,7 @@
 window.addEventListener("load", function () {
+    // Store combat panel reference globally
+    window.combatPanel = document.querySelector("#combatPanel");
+    
     if (player === null) {
         runLoad("character-creation", "flex");
     } else {
@@ -24,8 +27,34 @@ window.addEventListener("load", function () {
     // Add 'R' key listener for game restart with buffed enemy scaling
     document.addEventListener('keydown', function(event) {
         if (event.key.toLowerCase() === 'r') {
-            // Restart the game with buffed enemy scaling
-            restartGameWithBuffedEnemies();
+            // Show confirmation modal for complete reset
+            defaultModalElement.style.display = "flex";
+            defaultModalElement.innerHTML = `
+            <div class="content">
+                <h3>Complete Reset</h3>
+                <p>This will clear ALL game data and refresh the page. Continue?</p>
+                <div class="button-container">
+                    <button id="complete-reset-confirm">Yes, Reset Everything</button>
+                    <button id="complete-reset-cancel">Cancel</button>
+                </div>
+            </div>`;
+            
+            document.querySelector("#complete-reset-confirm").addEventListener("click", function() {
+                sfxConfirm.play();
+                // Clear all localStorage
+                localStorage.clear();
+                
+                // Wait a moment for sound to play, then reload page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            });
+            
+            document.querySelector("#complete-reset-cancel").addEventListener("click", function() {
+                sfxDecline.play();
+                defaultModalElement.style.display = "none";
+                defaultModalElement.innerHTML = "";
+            });
         }
     });
 
@@ -42,8 +71,9 @@ window.addEventListener("load", function () {
                 document.querySelector("#alert").innerHTML = "Name should be between 3-15 characters!";
             } else {
                 player = {
-                    name: playerName,
+                    name: playerName.trim(), // Ensure the name is trimmed
                     lvl: 1,
+                    heroImage: "1p.png", // Default hero image
                     stats: {
                         hp: null,
                         hpMax: null,
@@ -60,7 +90,7 @@ window.addEventListener("load", function () {
                         atk: 100,
                         def: 50,
                         pen: 0,
-                        atkSpd: 0.6,
+                        atkSpd: 0.4,
                         vamp: 0,
                         critRate: 0,
                         critDmg: 50
@@ -509,7 +539,12 @@ const enterDungeon = () => {
         showCombatInfo();
         startCombat(bgmBattleMain);
     } else {
-        bgmDungeon.play();
+        // Use safelyPlayDungeonMusic if it exists, otherwise fall back to direct play
+        if (typeof safelyPlayDungeonMusic === 'function') {
+            safelyPlayDungeonMusic();
+        } else {
+            bgmDungeon.play();
+        }
     }
     if (player.stats.hp == 0) {
         progressReset();
@@ -530,29 +565,66 @@ const saveData = () => {
     localStorage.setItem("volumeData", volumeData);
 }
 
-// Calculate every player stat
+// Calculate player stats from base stats, equipped items, and bonus stats
 const calculateStats = () => {
-    let equipmentAtkSpd = player.baseStats.atkSpd * (player.equippedStats.atkSpd / 100);
-    let playerHpBase = player.baseStats.hp;
-    let playerAtkBase = player.baseStats.atk;
-    let playerDefBase = player.baseStats.def;
-    let playerAtkSpdBase = player.baseStats.atkSpd;
-    let playerVampBase = player.baseStats.vamp;
-    let playerCRateBase = player.baseStats.critRate;
-    let playerCDmgBase = player.baseStats.critDmg;
+    let bonusHpPct = player.bonusStats.hp;
+    let bonusAtkPct = player.bonusStats.atk;
+    let bonusDefPct = player.bonusStats.def;
+    let bonusAtkSpdPct = player.bonusStats.atkSpd;
+    let bonusVampPct = player.bonusStats.vamp;
+    let bonusCritRatePct = player.bonusStats.critRate;
+    let bonusCritDmgPct = player.bonusStats.critDmg;
 
-    player.stats.hpMax = Math.round((playerHpBase + playerHpBase * (player.bonusStats.hp / 100)) + player.equippedStats.hp);
-    player.stats.atk = Math.round((playerAtkBase + playerAtkBase * (player.bonusStats.atk / 100)) + player.equippedStats.atk);
-    player.stats.def = Math.round((playerDefBase + playerDefBase * (player.bonusStats.def / 100)) + player.equippedStats.def);
-    player.stats.atkSpd = (playerAtkSpdBase + playerAtkSpdBase * (player.bonusStats.atkSpd / 100)) + equipmentAtkSpd + (equipmentAtkSpd * (player.equippedStats.atkSpd / 100));
-    player.stats.vamp = playerVampBase + player.bonusStats.vamp + player.equippedStats.vamp;
-    player.stats.critRate = playerCRateBase + player.bonusStats.critRate + player.equippedStats.critRate;
-    player.stats.critDmg = playerCDmgBase + player.bonusStats.critDmg + player.equippedStats.critDmg;
-
+    player.stats.hpMax = Math.round(player.baseStats.hp * (1 + (bonusHpPct / 100)) + player.equippedStats.hp);
+    player.stats.atk = Math.round(player.baseStats.atk * (1 + (bonusAtkPct / 100)) + player.equippedStats.atk);
+    player.stats.def = Math.round(player.baseStats.def * (1 + (bonusDefPct / 100)) + player.equippedStats.def);
+    player.stats.atkSpd = Number((player.baseStats.atkSpd * (1 + (bonusAtkSpdPct / 100)) + player.equippedStats.atkSpd).toFixed(2));
+    player.stats.vamp = Number((player.baseStats.vamp + bonusVampPct + player.equippedStats.vamp).toFixed(2));
+    player.stats.critRate = Number((player.baseStats.critRate + bonusCritRatePct + player.equippedStats.critRate).toFixed(2));
+    player.stats.critDmg = Number((player.baseStats.critDmg + bonusCritDmgPct + player.equippedStats.critDmg).toFixed(2));
+    
     // Caps attack speed to 2.5
     if (player.stats.atkSpd > 2.5) {
         player.stats.atkSpd = 2.5;
     }
+
+    // Skill effects
+    if (player.skills && player.skills.includes("Great Vitality")) {
+        // Increases your maximum health by 20%
+        player.stats.hpMax = Math.round(player.stats.hpMax + (player.stats.hpMax * 20) / 100);
+    }
+    if (player.skills && player.skills.includes("Golden Luck")) {
+        // Crit Rate and Crit Damage are increased by 10%
+        player.stats.critRate = Number((player.stats.critRate + 10).toFixed(2));
+        player.stats.critDmg = Number((player.stats.critDmg + 10).toFixed(2));
+    }
+}
+
+// Function to eat monster meat for HP recovery
+const eatMonsterMeat = () => {
+    // Check if player has monster meat
+    if (!player.inventory.consumables || !player.inventory.consumables.includes("monster meat")) {
+        addDungeonLog("You don't have any <span class='text-food'>monster meat</span> to consume.");
+        return;
+    }
+    
+    // Remove one monster meat from inventory
+    const meatIndex = player.inventory.consumables.indexOf("monster meat");
+    player.inventory.consumables.splice(meatIndex, 1);
+    
+    // Heal the player by exactly 25 HP
+    const healAmount = 25;
+    player.stats.hp = Math.min(player.stats.hp + healAmount, player.stats.hpMax);
+    
+    // Play eat sound
+    sfxBuff.play();
+    
+    // Add log message
+    addDungeonLog(`You ate some <span class='text-food'>monster meat</span> and recovered <span class='text-green'>${healAmount} HP</span>.`);
+    
+    // Update player stats
+    playerLoadStats();
+    saveData();
 }
 
 // Resets the progress back to start
@@ -682,6 +754,25 @@ const characterRandomizer = () => {
         {name: "Druid", icon: "ra ra-pine-tree"}
     ];
     
+    // Generate a random character name based on archetype
+    const generateRandomName = (archetype) => {
+        const namesByArchetype = {
+            "Warrior": ["Thorgrim", "Valeria", "Krom", "Darius", "Brunhild", "Ragnar", "Freya", "Conan", "Athena", "Leonidas"],
+            "Knight": ["Galahad", "Lancelot", "Guinevere", "Arthur", "Percival", "Roland", "Elaine", "Tristan", "Gareth", "Bedivere"],
+            "Assassin": ["Ezio", "Sombra", "Kage", "Nightshade", "Viper", "Wraith", "Shade", "Whisper", "Raven", "Silhouette"],
+            "Berserker": ["Ragnar", "Olaf", "Fenrir", "Skadi", "Bjorn", "Astrid", "Ulfric", "Helga", "Rollo", "Sigrid"],
+            "Mage": ["Merlin", "Morgana", "Gandalf", "Elminster", "Raistlin", "Seraphina", "Zephyr", "Alatar", "Nimue", "Thalia"],
+            "Ranger": ["Legolas", "Artemis", "Orion", "Skye", "Vex", "Ashe", "Hawk", "Sylvanas", "Talon", "Willow"],
+            "Paladin": ["Uther", "Solaire", "Tyrael", "Aveline", "Cassius", "Ophelia", "Radiant", "Lightbringer", "Justicar", "Sanctus"],
+            "Monk": ["Zenyatta", "Lee", "Iroh", "Aang", "Lotus", "Serenity", "Harmony", "Tranquil", "Enlightened", "Dao"],
+            "Druid": ["Malfurion", "Thalia", "Galen", "Sylvia", "Oakhart", "Willow", "Thorn", "Ivy", "Fern", "Grove"]
+        };
+        
+        // Select a random name from the appropriate list
+        const nameList = namesByArchetype[archetype.name] || ["Adventurer", "Hero", "Champion"];
+        return nameList[Math.floor(Math.random() * nameList.length)];
+    };
+    
     // Generate a random character
     const generateRandomCharacter = () => {
         // Generate random stat allocation (min 5, total 40 points)
@@ -708,7 +799,7 @@ const characterRandomizer = () => {
             hp: 50 * stats.hp,
             atk: 10 * stats.atk,
             def: 10 * stats.def,
-            atkSpd: 0.4 + (0.02 * stats.atkSpd)
+            atkSpd: 0.3 + (0.01 * stats.atkSpd)
         };
         
         // Select 1-2 random passive skills
@@ -726,11 +817,20 @@ const characterRandomizer = () => {
         // Select random archetype
         const archetype = archetypes[Math.floor(Math.random() * archetypes.length)];
         
+        // Generate a random name
+        const name = generateRandomName(archetype);
+        
+        // Assign a random hero image from 1-14
+        const heroImageNumber = Math.floor(Math.random() * 14) + 1;
+        const heroImage = `${heroImageNumber}p.png`;
+        
         return {
+            name,
             archetype,
             stats,
             calculatedStats,
-            skills: selectedSkills
+            skills: selectedSkills,
+            heroImage
         };
     };
     
@@ -740,6 +840,23 @@ const characterRandomizer = () => {
         generateRandomCharacter(),
         generateRandomCharacter()
     ];
+    
+    // Select one character to receive a bonus
+    const bonusIndex = Math.floor(Math.random() * 3);
+    characters[bonusIndex].hasBonus = true;
+    
+    // Apply bonus to the selected character (10% boost to all stats)
+    const bonusCharacter = characters[bonusIndex];
+    bonusCharacter.originalStats = {
+        hp: bonusCharacter.calculatedStats.hp,
+        atk: bonusCharacter.calculatedStats.atk,
+        def: bonusCharacter.calculatedStats.def,
+        atkSpd: bonusCharacter.calculatedStats.atkSpd
+    };
+    bonusCharacter.calculatedStats.hp = Math.floor(bonusCharacter.calculatedStats.hp * 1.1);
+    bonusCharacter.calculatedStats.atk = Math.floor(bonusCharacter.calculatedStats.atk * 1.1);
+    bonusCharacter.calculatedStats.def = Math.floor(bonusCharacter.calculatedStats.def * 1.1);
+    bonusCharacter.calculatedStats.atkSpd = parseFloat((bonusCharacter.calculatedStats.atkSpd * 1.1).toFixed(2));
     
     // Display the character selection modal
     defaultModalElement.style.display = "flex";
@@ -753,16 +870,41 @@ const characterRandomizer = () => {
              <p class="skill-description">${skill.description}</p>`
         ).join('');
         
-        characterCards += `
-        <div class="character-card" data-index="${index}">
-            <div class="character-header">
-                <h3><i class="${character.archetype.icon}"></i> ${character.archetype.name}</h3>
-            </div>
-            <div class="character-stats">
+        // Format stats with green color and up arrow for bonus character
+        let statsHtml = '';
+        if (character.hasBonus) {
+            statsHtml = `
+                <p><i class="fas fa-heart"></i> HP: <span style="color: #2ecc71;">${character.calculatedStats.hp} <i class="fas fa-arrow-up"></i></span></p>
+                <p><i class="ra ra-sword"></i> ATK: <span style="color: #2ecc71;">${character.calculatedStats.atk} <i class="fas fa-arrow-up"></i></span></p>
+                <p><i class="ra ra-round-shield"></i> DEF: <span style="color: #2ecc71;">${character.calculatedStats.def} <i class="fas fa-arrow-up"></i></span></p>
+                <p><i class="ra ra-plain-dagger"></i> ATK.SPD: <span style="color: #2ecc71;">${character.calculatedStats.atkSpd.toFixed(2)} <i class="fas fa-arrow-up"></i></span></p>
+            `;
+        } else {
+            statsHtml = `
                 <p><i class="fas fa-heart"></i> HP: ${character.calculatedStats.hp}</p>
                 <p><i class="ra ra-sword"></i> ATK: ${character.calculatedStats.atk}</p>
                 <p><i class="ra ra-round-shield"></i> DEF: ${character.calculatedStats.def}</p>
                 <p><i class="ra ra-plain-dagger"></i> ATK.SPD: ${character.calculatedStats.atkSpd.toFixed(2)}</p>
+            `;
+        }
+        
+        const bonusIndicator = character.hasBonus ? 
+            `<div class="bonus-pill">+10% Stats</div>` : '';
+        
+        characterCards += `
+        <div class="character-card${character.hasBonus ? ' bonus-character' : ''}" data-index="${index}">
+            ${bonusIndicator}
+            <div class="character-header">
+                <div class="character-image">
+                    <img src="./assets/sprites/heros/${character.heroImage}" alt="${character.name}" class="hero-portrait">
+                </div>
+                <div class="character-title">
+                    <h3><i class="${character.archetype.icon}"></i> ${character.archetype.name}</h3>
+                    <span class="character-name">${character.name}</span>
+                </div>
+            </div>
+            <div class="character-stats">
+                ${statsHtml}
             </div>
             <div class="character-skills">
                 <h4>Passive Skills:</h4>
@@ -812,6 +954,12 @@ const characterRandomizer = () => {
                     player.baseStats.atkSpd = player.baseStats.atkSpd - ((30 * player.baseStats.atkSpd) / 100);
                 }
             });
+            
+            // Save hero image and name explicitly
+            player.heroImage = selectedCharacter.heroImage;
+            player.name = selectedCharacter.name;
+            
+            console.log("Selected character name:", player.name); // Debug log
             
             // Proceed to dungeon
             player.allocated = true;
